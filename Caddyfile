@@ -1,66 +1,33 @@
-# Global options for better ACME handling
+# Global options - Disable automatic HTTPS redirects
 {
     # Use production CA for new domain
     acme_ca https://acme-v02.api.letsencrypt.org/directory
     email admin@hizidan.com  # Replace with your email
     
-    # Uncomment below if HTTP challenge fails and you want to use DNS challenge
-    # acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+    # Disable automatic HTTPS redirects
+    auto_https off
 }
 
-# n8n workflow automation - using different subdomain to avoid rate limit
-n8n.hizidan.com {
+# n8n workflow automation - HTTP only to avoid redirect loops
+http://n8n.hizidan.com, https://n8n.hizidan.com {
     reverse_proxy n8n:5678 {
         header_up Host {host}
         header_up X-Real-IP {remote_host}
         header_up X-Forwarded-For {remote_host}
-        header_up X-Forwarded-Proto https
+        header_up X-Forwarded-Proto {scheme}
         header_up X-Forwarded-Host {host}
     }
     
     # Enable compression
     encode gzip
-    
-    # Security headers
-    header {
-        # Enable HSTS
-        Strict-Transport-Security max-age=31536000;
-        # Prevent MIME type sniffing
-        X-Content-Type-Options nosniff
-        # Prevent clickjacking
-        X-Frame-Options DENY
-        # XSS protection
-        X-XSS-Protection "1; mode=block"
-    }
 }
 
-# MongoDB external access via subdomain
-# Note: This exposes MongoDB directly - use with IP restrictions in production
-mongodb.hizidan.com {
+# MongoDB external access via subdomain - HTTP/HTTPS both supported
+http://mongodb.hizidan.com, https://mongodb.hizidan.com {
     reverse_proxy mongodb:27017
-    
-    # Optional: Restrict access to specific IPs
-    # @blocked not remote_ip 192.168.1.0/24 10.0.0.0/8
-    # respond @blocked "Access denied" 403
 }
 
-# MongoDB Web UI (mongo-express)
-mongoui.hizidan.com {
+# MongoDB Web UI (mongo-express) - HTTP/HTTPS both supported
+http://mongoui.hizidan.com, https://mongoui.hizidan.com {
     reverse_proxy mongo-express:8081
-    
-    # Security headers
-    header {
-        # Enable HSTS
-        Strict-Transport-Security max-age=31536000;
-        # Prevent MIME type sniffing
-        X-Content-Type-Options nosniff
-        # Prevent clickjacking
-        X-Frame-Options DENY
-        # XSS protection
-        X-XSS-Protection "1; mode=block"
-    }
-    
-    # Optional: Restrict access to specific IPs
-    # @blocked not remote_ip 192.168.1.0/24 10.0.0.0/8
-    # respond @blocked "Access denied" 403
 }
