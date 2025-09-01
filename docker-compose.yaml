@@ -47,10 +47,10 @@ services:
       - N8N_RUNNERS_MODE=internal
       - WEBHOOK_URL
       - N8N_PROTOCOL
-      - N8N_HOST=flow.hizidan.com
+      - N8N_HOST
       - N8N_PORT=5678
       - N8N_LISTEN_ADDRESS=0.0.0.0
-      - N8N_EDITOR_BASE_URL=https://flow.hizidan.com
+      - N8N_EDITOR_BASE_URL
       - N8N_SECURE_COOKIE=false
       - N8N_DISABLE_UI=false
       - N8N_PATH=/

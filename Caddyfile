@@ -1,15 +1,15 @@
 # Global options for better ACME handling
 {
-    # Use staging CA to avoid rate limits while testing
-    acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+    # Use production CA for new domain
+    acme_ca https://acme-v02.api.letsencrypt.org/directory
     email admin@hizidan.com  # Replace with your email
     
     # Uncomment below if HTTP challenge fails and you want to use DNS challenge
     # acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}
 }
 
-# n8n workflow automation
-flow.hizidan.com {
+# n8n workflow automation - using different subdomain to avoid rate limit
+n8n.hizidan.com {
     reverse_proxy n8n:5678 {
         header_up Host {host}
         header_up X-Real-IP {remote_host}
@@ -36,18 +36,16 @@ flow.hizidan.com {
 
 # MongoDB external access via subdomain
 # Note: This exposes MongoDB directly - use with IP restrictions in production
-# COMMENTED OUT - Enable only after DNS records are set up
-# mongo.hizidan.com {
-#     reverse_proxy mongodb:27017
-#     
-#     # Optional: Restrict access to specific IPs
-#     # @blocked not remote_ip 192.168.1.0/24 10.0.0.0/8
-#     # respond @blocked "Access denied" 403
-# }
+mongodb.hizidan.com {
+    reverse_proxy mongodb:27017
+    
+    # Optional: Restrict access to specific IPs
+    # @blocked not remote_ip 192.168.1.0/24 10.0.0.0/8
+    # respond @blocked "Access denied" 403
+}
 
 # MongoDB Web UI (mongo-express)
-# COMMENTED OUT - Enable only after DNS records are set up
-mongoweb.hizidan.com {
+mongoui.hizidan.com {
     reverse_proxy mongo-express:8081
     
     # Security headers
@@ -66,8 +64,3 @@ mongoweb.hizidan.com {
     # @blocked not remote_ip 192.168.1.0/24 10.0.0.0/8
     # respond @blocked "Access denied" 403
 }
-
-# Add more domains here as needed
-# example.hizidan.com {
-#     reverse_proxy service_name:port
-# }
