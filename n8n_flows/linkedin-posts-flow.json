@@ -1,0 +1,942 @@
+{
+  "name": "Auto-Post to Linkeding",
+  "nodes": [
+    {
+      "parameters": {
+        "url": "https://hacker-news.firebaseio.com/v0/topstories.json",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "5c6b76a6-f5aa-4a8f-9536-f74172071dbe",
+      "name": "Fetch Hacker News IDs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -64,
+        1440
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://dev.to/api/articles",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "top",
+              "value": "7"
+            },
+            {
+              "name": "per_page",
+              "value": "15"
+            },
+            {
+              "name": "tag",
+              "value": "devchallenge,cleancode,eventdriven,architecture"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "LRrqxus494zQeibqmnBNinp5"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "14f4e534-f7be-4672-9eb1-1208c29c9abd",
+      "name": "Fetch Dev.to Articles",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -64,
+        1648
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get top 8 Hacker News story IDs\nconst storyIds = $input.all()\nreturn storyIds.map(story => ({ story_id: story.json}));"
+      },
+      "id": "6b04f04c-6492-42a2-b6ac-14baa87a4f2a",
+      "name": "Process HN IDs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        160,
+        1440
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://hacker-news.firebaseio.com/v0/item/{{ $json.story_id }}.json",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "1ef92d1f-454f-44f4-9085-2231042a9c79",
+      "name": "Get HN Story Details",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        384,
+        1440
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Combine and format all tech articles\nconst hnStories = $input.all().filter(item => item.json && item.json.title && item.json.url);\n\n const allArticles = [];\n// Process Hacker News stories (filter high-quality content)\nhnStories.forEach(story => {\n  if (story.json.score > 80 && story.json.url) { // Only high-scoring stories with URLs\n    allArticles.push({\n      title: story.json.title,\n      url: story.json.url,\n      source: 'Hacker News',\n      score: story.json.score,\n      comments: story.json.descendants || 0,\n      type: 'article',\n      author: story.json.by || 'Unknown',\n      published_at: new Date(story.json.time * 1000).toISOString()\n    });\n  }\n});\n\n// Sort by engagement and return top 10\nallArticles.sort((a, b) => (b.score + b.comments) - (a.score + a.comments));\nreturn allArticles.slice(0, 10);"
+      },
+      "id": "6e4ba891-74e4-4686-af66-86c4d8f49518",
+      "name": "Combine & Filter Articles",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        1344
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare comprehensive data for Google Sheets review\nconst items = $input.all();\nconst sourceInputs = $('Unify AI inputs').all()\nconst sheetsData = [];\n\nfor (let i = 0; i < items.length; i++) {\n  const originalData = items[i].json;\n  const generatedPost = $('Generate Posts').all()[i]?.json?.content.parts[0].text || '';\n  const suggestedHashtags = $('Export Post Hashtags').all()[i]?.json?.content.parts[0].text || '#تكنولوجيا #برمجة';\n  \n  sheetsData.push({\n    'Date Created': sourceInputs?.[i]?.json?.published_at,\n    'Source': originalData.source,\n    'Original Title': sourceInputs?.[i]?.json?.title,\n    'Original URL': sourceInputs?.[i]?.json?.url,\n    'Author': sourceInputs?.[i]?.json?.author,\n    'Generated Arabic Post': generatedPost,\n    'AI Suggested Hashtags': suggestedHashtags,\n    'Status': 'Pending Review',\n    'Approved': 'No',\n    'Published': 'No',\n    'Engagement Score': originalData.score || 0,\n    'Article Tags': Array.isArray(originalData.tags) ? originalData.tags.join(', ') : (originalData.tags || ''),\n    'Content Type': originalData.type || 'article'\n  });\n}\n\nreturn sheetsData;"
+      },
+      "id": "5807f87a-7a1a-4afb-a433-3bfb27bc3b17",
+      "name": "Format for Review Sheet",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1616,
+        1552
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1T_QIlf_WYfKqAgA-1cEaiUIxNm-HH2ZD1LUdHNdqs2o",
+          "mode": "list",
+          "cachedResultName": "Linkedin Posts",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1T_QIlf_WYfKqAgA-1cEaiUIxNm-HH2ZD1LUdHNdqs2o/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1872745231,
+          "mode": "list",
+          "cachedResultName": "Posts and Articles-Grid view",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1T_QIlf_WYfKqAgA-1cEaiUIxNm-HH2ZD1LUdHNdqs2o/edit#gid=1872745231"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Content Body": "={{ $json['Generated Arabic Post'] }}",
+            "Fetched At": "={{ $json['Date Created'] }}",
+            "Publish Status": "={{ $json.Published }}",
+            "Tags": "={{ $json['AI Suggested Hashtags'] }}",
+            "Author": "={{ $json.Author }}",
+            "Title": "={{ $json['Original Title'] }}",
+            "Source Link": "={{ $json['Original URL'] }}"
+          },
+          "matchingColumns": [
+            "Source Link"
+          ],
+          "schema": [
+            {
+              "id": "Title",
+              "displayName": "Title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Content Body",
+              "displayName": "Content Body",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Fetched At",
+              "displayName": "Fetched At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Publish Status",
+              "displayName": "Publish Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Published At",
+              "displayName": "Published At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Is Approved",
+              "displayName": "Is Approved",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "LinkedIn Preview Image",
+              "displayName": "LinkedIn Preview Image",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Author",
+              "displayName": "Author",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Tags",
+              "displayName": "Tags",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Source Link",
+              "displayName": "Source Link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "LinkedIn Link",
+              "displayName": "LinkedIn Link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "95bd8472-f6f1-4fb6-b482-696c5c543609",
+      "name": "Save to Review Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1840,
+        1552
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "VcId68PqpoOw4VmL",
+          "name": "Google Sheets(php.ahmedfathi)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "1248615787",
+        "text": "=A new  {{ $json.posts_count }} posts has been saved and waiting for your review",
+        "additionalFields": {}
+      },
+      "id": "6f9cd196-fd14-4992-88f1-fa151e56d4ab",
+      "name": "Telegram Notification",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2256,
+        1552
+      ],
+      "webhookId": "9e56456c-47da-4295-ab4f-9349f1c5e8cc",
+      "executeOnce": true,
+      "retryOnFail": true,
+      "credentials": {
+        "telegramApi": {
+          "id": "ZDD4rrhNPaLLzhVF",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 10
+            },
+            {
+              "triggerAtHour": 18
+            }
+          ]
+        }
+      },
+      "id": "f9597515-58aa-4ae9-9b7d-186c244c957e",
+      "name": "Publishing Schedule (9AM & 3PM)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -288,
+        1952
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1T_QIlf_WYfKqAgA-1cEaiUIxNm-HH2ZD1LUdHNdqs2o",
+          "mode": "list",
+          "cachedResultName": "Linkedin Posts",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1T_QIlf_WYfKqAgA-1cEaiUIxNm-HH2ZD1LUdHNdqs2o/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1872745231,
+          "mode": "list",
+          "cachedResultName": "Posts and Articles-Grid view",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1T_QIlf_WYfKqAgA-1cEaiUIxNm-HH2ZD1LUdHNdqs2o/edit#gid=1872745231"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Is Approved",
+              "lookupValue": "Yes"
+            },
+            {
+              "lookupColumn": "Publish Status",
+              "lookupValue": "No"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1e2a04a3-f02f-40fc-a24a-f29bb94efe86",
+      "name": "Check Approved Posts",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -64,
+        1952
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "VcId68PqpoOw4VmL",
+          "name": "Google Sheets(php.ahmedfathi)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "person": "y5FprIXA1b",
+        "text": "={{ $json['Content Body'] }}\n\n{{ $json.Tags }}",
+        "additionalFields": {
+          "visibility": "PUBLIC"
+        }
+      },
+      "id": "84b6f30e-cfab-4c1b-a109-bc9b3f8231be",
+      "name": "Publish to LinkedIn",
+      "type": "n8n-nodes-base.linkedIn",
+      "typeVersion": 1,
+      "position": [
+        384,
+        1952
+      ],
+      "credentials": {
+        "linkedInOAuth2Api": {
+          "id": "XI1I0dgccUF4Rs6Y",
+          "name": "LinkedIn account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1T_QIlf_WYfKqAgA-1cEaiUIxNm-HH2ZD1LUdHNdqs2o",
+          "mode": "list",
+          "cachedResultName": "Linkedin Posts",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1T_QIlf_WYfKqAgA-1cEaiUIxNm-HH2ZD1LUdHNdqs2o/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1872745231,
+          "mode": "list",
+          "cachedResultName": "Posts and Articles-Grid view",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1T_QIlf_WYfKqAgA-1cEaiUIxNm-HH2ZD1LUdHNdqs2o/edit#gid=1872745231"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Source Link": "={{ $('Check Approved Posts').item.json['Source Link'] }}",
+            "Publish Status": "=Published",
+            "Published At": "={{ new Date().toDateTime().setZone('Africa/Cairo').format('yyyy-MM-dd H:m:s a')}}",
+            "LinkedIn Link": "=https://www.linkedin.com/posts/activity-{{ ($json.urn).split(':').slice(-1) }}"
+          },
+          "matchingColumns": [
+            "Source Link"
+          ],
+          "schema": [
+            {
+              "id": "Title",
+              "displayName": "Title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Content Body",
+              "displayName": "Content Body",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Fetched At",
+              "displayName": "Fetched At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Publish Status",
+              "displayName": "Publish Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Published At",
+              "displayName": "Published At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Is Approved",
+              "displayName": "Is Approved",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "LinkedIn Preview Image",
+              "displayName": "LinkedIn Preview Image",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Author",
+              "displayName": "Author",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Tags",
+              "displayName": "Tags",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Source Link",
+              "displayName": "Source Link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "LinkedIn Link",
+              "displayName": "LinkedIn Link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "09e8648c-5195-422c-b327-e211dea1476f",
+      "name": "Mark as Published",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        608,
+        1952
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "VcId68PqpoOw4VmL",
+          "name": "Google Sheets(php.ahmedfathi)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "1248615787",
+        "text": "=🎉 **تم نشر منشور LinkedIn بنجاح!**\n\n📝 **تفاصيل المنشور:**\n• العنوان الأصلي: {{ $('Check Approved Posts').item.json.Title }}\n• المصدر: {{ $('Check Approved Posts').item.json['Source Link'] }}\n• وقت النشر: {{ $json['Published At'] }}\n\n🔗 **الرابط:** \n{{ $json['LinkedIn Link'] }}\n\n✅ **تم تحديث حالة النشر في Google Sheets**",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "80009201-8691-4090-82bf-4f3acac3b5ed",
+      "name": "Success Notification",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        816,
+        1952
+      ],
+      "webhookId": "8bc7a998-9c5e-4cda-bd81-81366606e9cb",
+      "credentials": {
+        "telegramApi": {
+          "id": "ZDD4rrhNPaLLzhVF",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": " const devArticles = $input?.all() || [];\n\nconst allArticles = [];\n// Process Dev.to articles (filter by engagement)\ndevArticles.forEach(item => {\n  const article = item.json;\n  if (article.positive_reactions_count > 10) { // Filter by engagement\n    allArticles.push({\n      title: article.title,\n      url: article.url,\n      source: 'Dev.to',\n      score: article.positive_reactions_count || 0,\n      comments: article.comments_count || 0,\n      tags: article.tag_list || [],\n      type: 'article',\n      author: article.user?.name || 'Unknown',\n      published_at: article.published_at,\n      description: article.description || ''\n    });\n  }\n});\n\n// Sort by engagement and return top 10\nallArticles.sort((a, b) => (b.score + b.comments) - (a.score + a.comments));\nreturn allArticles.slice(0, 10);"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        1632
+      ],
+      "id": "4984efa9-a0a1-423f-b039-8dc576d51113",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=أنت خبير في التكنولوجيا ومتخصص في كتابة المحتوى التقني باللهجة المصرية. مهمتك هي تحويل الأخبار التقنية إلى منشورات جذابة ومفيدة للمهندسين والمطورين المصريين.\n\nبيانات المقال:\nالعنوان: {{ $json.title }}\nالمصدر: {{ $json.source }}\nالرابط: {{ $json.url }}\nالكاتب: {{ $json.author }}\nالوصف: {{ $json.description || 'غير متوفر' }}\nالتاجز: {{ $json.tags ? $json.tags.join(', ') : 'غير متوفر' }}\n\nاكتب منشور LinkedIn احترافي باللهجة المصرية يتضمن:\n\n🎯 **الهيكل المطلوب:**\n1. **مقدمة جذابة** - اجعل القارئ يشعر بأهمية الموضوع\n2. **شرح مبسط للتقنية** - بلغة سهلة ومفهومة\n3. **الفائدة العملية** - كيف يمكن للمطورين الاستفادة منها\n4. **نصيحة أو insight شخصي** - إضافة قيمة من خبرتك\n5. **دعوة للتفاعل** - سؤال أو دعوة للنقاش\n6. **هاشتاجات مناسبة** - 5-8 هاشتاجات\n\n📝 **متطلبات الكتابة:**\n- طول المنشور: 200-300 كلمة\n- اللهجة: مصرية مهنية (مزج بين العامية والفصحى)\n- الأسلوب: ودود، تفاعلي، وخبير\n- التركيز: قيمة عملية للمطورين والمهندسين\n- استخدم إيموجي بطريقة احترافية\n\n🔥 **نصائح الكتابة:**\n- ابدأ بخطاف قوي\n- استخدم أمثلة عملية\n- اجعل المحتوى قابل للتطبيق\n- اختتم بسؤال يشجع التفاعل\n\nاكتب المنشور فقط بدون أي تعليقات إضافية:"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1,
+      "position": [
+        960,
+        1568
+      ],
+      "id": "54715515-bede-42ba-9a76-ea4aad470ade",
+      "name": "Generate Posts",
+      "executeOnce": false,
+      "retryOnFail": true,
+      "credentials": {
+        "googlePalmApi": {
+          "id": "cA25iD7hLolcPp9v",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=أنت خبير في وسائل التواصل الاجتماعي ومتخصص في إنشاء هاشتاجات فعالة للمحتوى التقني باللغة العربية والإنجليزية للمجتمع التقني المصري.\n\nالمحتوى المُولد:\n{{ $json.content.parts[0].text }}\n\nمطلوب منك إنشاء 8-10 هاشتاجات ذات صلة وفعالة لهذا المنشور. يجب أن تشمل:\n\n🎯 **متطلبات الهاشتاجات:**\n1. **مزج بين العربية والإنجليزية** - استخدم هاشتاجات عربية وإنجليزية\n2. **مصطلحات تقنية** - اربطها بالموضوع التقني المحدد\n3. **المجتمع المصري** - هاشتاجات تخص المطورين والمهندسين المصريين\n4. **ترندنج هاشتاجات** - استخدم هاشتاجات شائعة في LinkedIn\n5. **تقنيات محددة** - إذا ذُكرت تقنيات معينة، أضف هاشتاجاتها\n\n📝 **تنسيق الهاشتاجات:**\n- استخدم الرمز # قبل كل هاشتاج\n- افصل بين الهاشتاجات بمسافة\n- امزج بين الهاشتاجات العربية والإنجليزية\n- مثال: #تطوير #البرمجة #TechNews #Programming #ReactJS #مطورين_مصر\n\n🔥 **أمثلة هاشتاجات عربية شائعة:**\n#تطوير #البرمجة #تكنولوجيا #مطورين_مصر #هندسة_البرمجيات #ذكاء_اصطناعي #تطبيقات_الموبايل\n\n💻 **أمثلة هاشتاجات إنجليزية شائعة:**\n#TechNews #Programming #SoftwareEngineering #WebDevelopment #AI #MachineLearning #DevLife #Innovation\n\nأرجع فقط الهاشتاجات مفصولة بمسافات، بدون أي تعليقات إضافية:"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1,
+      "position": [
+        1264,
+        1568
+      ],
+      "id": "c5f8973b-cb9b-4f5a-bc95-a60285d0a154",
+      "name": "Export Post Hashtags",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "cA25iD7hLolcPp9v",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all()"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        768,
+        1536
+      ],
+      "id": "d444fc13-a009-4a5a-9682-9b644f90bb0f",
+      "name": "Unify AI inputs"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.all();\nreturn {\n  posts_count: data.length,\n  \n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2048,
+        1552
+      ],
+      "id": "31b39ffc-2da1-4976-b70d-f05093de70c2",
+      "name": "Prepare Telegram Message"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 12
+            }
+          ]
+        }
+      },
+      "id": "bcafa1f9-8e64-450e-8fc8-f0392cdaf6ca",
+      "name": "Daily every 12 hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -288,
+        1552
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Fetch Hacker News IDs": {
+      "main": [
+        [
+          {
+            "node": "Process HN IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process HN IDs": {
+      "main": [
+        [
+          {
+            "node": "Get HN Story Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get HN Story Details": {
+      "main": [
+        [
+          {
+            "node": "Combine & Filter Articles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Dev.to Articles": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine & Filter Articles": {
+      "main": [
+        [
+          {
+            "node": "Unify AI inputs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format for Review Sheet": {
+      "main": [
+        [
+          {
+            "node": "Save to Review Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save to Review Sheet": {
+      "main": [
+        [
+          {
+            "node": "Prepare Telegram Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publishing Schedule (9AM & 3PM)": {
+      "main": [
+        [
+          {
+            "node": "Check Approved Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Approved Posts": {
+      "main": [
+        [
+          {
+            "node": "Publish to LinkedIn",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish to LinkedIn": {
+      "main": [
+        [
+          {
+            "node": "Mark as Published",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark as Published": {
+      "main": [
+        [
+          {
+            "node": "Success Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "Unify AI inputs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Posts": {
+      "main": [
+        [
+          {
+            "node": "Export Post Hashtags",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Export Post Hashtags": {
+      "main": [
+        [
+          {
+            "node": "Format for Review Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unify AI inputs": {
+      "main": [
+        [
+          {
+            "node": "Generate Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Telegram Message": {
+      "main": [
+        [
+          {
+            "node": "Telegram Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily every 12 hours": {
+      "main": [
+        [
+          {
+            "node": "Fetch Hacker News IDs",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Dev.to Articles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {},
+  "versionId": "d78af437-8100-4272-a22f-843a528e1446",
+  "meta": {
+    "templateId": "3883",
+    "templateCredsSetupCompleted": true,
+    "instanceId": "e0b37212ca194e3d04b917b99a668a3fee18a61c727185be2157b01e6b5e2c6f"
+  },
+  "id": "jvYeNzEL9cvwbTnO",
+  "tags": [
+    {
+      "createdAt": "2025-09-03T07:32:21.102Z",
+      "updatedAt": "2025-09-03T07:32:21.102Z",
+      "id": "oP9r1gTI60IjQHc4",
+      "name": "Zidan"
+    },
+    {
+      "createdAt": "2025-09-03T07:32:27.987Z",
+      "updatedAt": "2025-09-03T07:32:27.987Z",
+      "id": "igCMumiftigtKVVE",
+      "name": "Linkedin"
+    },
+    {
+      "createdAt": "2025-09-03T07:32:32.448Z",
+      "updatedAt": "2025-09-03T07:32:32.448Z",
+      "id": "hGgVyuUM9xfAAM1e",
+      "name": "Telegram"
+    },
+    {
+      "createdAt": "2025-09-03T07:32:42.848Z",
+      "updatedAt": "2025-09-03T07:32:42.848Z",
+      "id": "fY6TdYM1BRA8pTLx",
+      "name": "tech"
+    }
+  ]
+}
